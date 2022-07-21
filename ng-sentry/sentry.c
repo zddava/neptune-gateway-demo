@@ -18,7 +18,7 @@ static int __init sentry_init(void)
   // 初始化实时调试
   // 初始化字符设备
   // 初始化netlink
-  // 添加netfilter钩子，特定域名丢包
+  // 添加netfilter钩子，特定域名丢包，识别特定域名包
   return 0;
 }
 
