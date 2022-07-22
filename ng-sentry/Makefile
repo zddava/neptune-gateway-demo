@@ -1,4 +1,6 @@
-obj-m=sentry.o
+obj-m += ng-sentry.o
+ng-sentry-objs := sentry.o logger.o rule.o
+
 PWD=$(shell pwd)
 KERNEL_DIR="/opt/openwrt-sdk/build_dir/target-i386_pentium4_musl/linux-x86_generic/linux-5.4.188/"
 TOOLCHAIN_DIR="/opt/openwrt-sdk/staging_dir/toolchain-i386_pentium4_gcc-8.4.0_musl/bin/i486-openwrt-linux-"
