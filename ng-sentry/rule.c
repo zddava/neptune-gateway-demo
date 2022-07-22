@@ -70,6 +70,11 @@ void read_config_content(char **config_buffer)
   filp_close(fp, NULL);
 }
 
+void add_rule_item(char *config_line)
+{ // url::ip::action::[tag]   www.baidu.com::192.168.100.100::DROP::
+  
+}
+
 int read_config_file()
 {
   char *config_buffer = NULL;
@@ -80,7 +85,32 @@ int read_config_file()
     return EXIT_FAILURE;
   }
 
-  NG_INFO("%s", config_buffer);
+  // NG_INFO("%s", config_buffer);
+  char *p_cur, *line_start;
+  p_cur = line_start = config_buffer;
+  char line_buffer[MAX_RULE_LINE_LEN];
+
+  while (*p_cur++)
+  {
+    if (*p_cur == '\n')
+    {
+      memset(line_buffer, 0, sizeof(line_buffer));
+      strncpy(line_buffer, line_start, p_cur - line_start);
+
+      add_rule_item(line_buffer);
+      line_start = p_cur + 1;
+    }
+  }
+
+  if (p_cur != line_start)
+  { // 多出来的一行或者只有一行没有换行
+    memset(line_buffer, 0, sizeof(line_buffer));
+    strncpy(line_buffer, line_start, p_cur - line_start);
+
+    add_rule_item(line_buffer);
+  }
+
+  kfree(config_buffer);
 
   return EXIT_SUCCESS;
 }
