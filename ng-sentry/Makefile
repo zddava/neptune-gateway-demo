@@ -1,5 +1,5 @@
 obj-m += ng-sentry.o
-ng-sentry-objs := sentry.o logger.o rule.o ng_string.o
+ng-sentry-objs := sentry.o logger.o rule.o ng_string.o ng_util.o
 
 PWD=$(shell pwd)
 KERNEL_DIR="/opt/openwrt-sdk/build_dir/target-i386_pentium4_musl/linux-x86_generic/linux-5.4.188/"

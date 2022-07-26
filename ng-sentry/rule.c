@@ -163,7 +163,7 @@ void add_rcg_rule_item(char *config_line)
 }
 
 void add_iso_rule_item(char *config_line)
-{// ip min::ip max::isp
+{ // ip min::ip max::isp
 }
 
 int load_rcg_config_file(void)
