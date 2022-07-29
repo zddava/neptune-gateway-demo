@@ -4,6 +4,7 @@
 #include <linux/types.h>
 #include <linux/slab.h>
 #include <linux/list.h>
+#include <linux/netfilter.h>
 
 #include "rule.h"
 #include "logger.h"
@@ -13,7 +14,7 @@
 struct rcg_rule_handler_entry
 {
   char *action;
-  int (*handler)(void);
+  int (*handler)(flow_info_t *, uint32_t mark);
 };
 
 struct rcg_rule_handler_entry rcg_rule_handler_map[] = {
@@ -32,6 +33,9 @@ struct rcg_rule_handler_entry rcg_rule_handler_map[] = {
 };
 
 struct list_head rcg_config_list_head = LIST_HEAD_INIT(rcg_config_list_head);
+ng_isp_item_t *isp_config[8192];
+
+int isp_config_index;
 
 void read_config_content(char **config_buffer, char *filename)
 {
@@ -88,9 +92,6 @@ int read_line_based_config(char *filename, void (*line_handler)(char *))
     return EXIT_FAILURE;
   }
 
-  NG_DEBUG("read config file(%s):\n", filename);
-  NG_DEBUG("%s", config_buffer);
-
   p_cur = line_start = config_buffer;
 
   while (*p_cur++)
@@ -122,7 +123,7 @@ void add_rcg_rule_item(char *config_line)
 { // url::ip::action::[tag]   www.baidu.com::192.168.100.100::DROP::
   char *rule_arr[4];
   int len = fsplit(rule_arr, config_line, "::");
-  ng_rule_item *item;
+  ng_rcg_item_t *item;
   int i;
 
   if (len < 3)
@@ -130,7 +131,7 @@ void add_rcg_rule_item(char *config_line)
     return;
   }
 
-  item = kzalloc(sizeof(ng_rule_item), GFP_KERNEL);
+  item = kzalloc(sizeof(ng_rcg_item_t), GFP_KERNEL);
   if (item == NULL)
   {
     NG_ERROR("malloc config memory error: %s\n", config_line);
@@ -138,10 +139,10 @@ void add_rcg_rule_item(char *config_line)
   }
 
   strcpy(item->host_url, rule_arr[0]);
-  strcpy(item->host_ip, rule_arr[1]);
+  sscanf(rule_arr[1], "%d", &(item->host_ip));
   if (len > 3)
   {
-    strcpy(item->tag, rule_arr[3]);
+    sscanf(rule_arr[3], "%d", &(item->mark));
   }
 
   for (i = 0; i < sizeof(rcg_rule_handler_map) / sizeof(struct rcg_rule_handler_entry); i++)
@@ -155,6 +156,7 @@ void add_rcg_rule_item(char *config_line)
 
   if (NULL == item->handler)
   {
+    NG_WARN("rcg handler not found: %s", config_line);
     kfree(item);
     return;
   }
@@ -162,8 +164,47 @@ void add_rcg_rule_item(char *config_line)
   list_add(&(item->head), &rcg_config_list_head);
 }
 
-void add_iso_rule_item(char *config_line)
+void add_isp_rule_item(char *config_line)
 { // ip min::ip max::isp
+  char *rule_arr[3];
+  int len = fsplit(rule_arr, config_line, "::");
+  ng_isp_item_t *item = NULL;
+
+  if (len < 3)
+  {
+    return;
+  }
+
+  item = kzalloc(sizeof(ng_isp_item_t), GFP_KERNEL);
+  if (item == NULL)
+  {
+    NG_ERROR("malloc config memory error: %s\n", config_line);
+    return;
+  }
+
+  sscanf(rule_arr[0], "%d", &(item->first));
+  sscanf(rule_arr[1], "%d", &(item->last));
+
+  if (strcmp(rule_arr[2], "ctc") == 0)
+  {
+    item->isp = CTC;
+  }
+  else if (strcmp(rule_arr[2], "cucc") == 0)
+  {
+    item->isp = CUCC;
+  }
+  else if (strcmp(rule_arr[2], "cmcc") == 0)
+  {
+    item->isp = CMCC;
+  }
+  else
+  {
+    NG_WARN("isp not found: %s", config_line);
+    kfree(item);
+    return;
+  }
+
+  isp_config[isp_config_index++] = item;
 }
 
 int load_rcg_config_file(void)
@@ -173,20 +214,87 @@ int load_rcg_config_file(void)
 
 int load_isp_config_file(void)
 {
-  return read_line_based_config(ISO_RULE_CONFIG_FILE, add_rcg_rule_item);
+  isp_config_index = 0;
+  return read_line_based_config(ISO_RULE_CONFIG_FILE, add_isp_rule_item);
 }
 
-int handle_accept(void)
+int match_rcg_item(ng_rcg_item_t **item, flow_info_t *flow)
 {
-  return EXIT_SUCCESS;
+  ng_rcg_item_t *i, *n;
+
+  if (list_empty(&rcg_config_list_head))
+  {
+    return FALSE;
+  }
+
+  list_for_each_entry_safe(i, n, &rcg_config_list_head, head)
+  {
+    if (flow->dstip == i->host_ip)
+    {
+      *item = i;
+      return TRUE;
+    }
+  }
+
+  return FALSE;
 }
 
-int handle_drop(void)
+int ip_network_search(ng_isp_item_t **matched, uint32_t ip)
 {
-  return EXIT_SUCCESS;
+  int start = 0;
+  int end = isp_config_index - 1;
+  ng_isp_item_t *item;
+
+  while (start <= end)
+  {
+    int mid = (start + end) / 2;
+    item = isp_config[mid];
+
+    if (ip < item->first)
+    {
+      end = mid - 1;
+    }
+    else if (ip > item->last)
+    {
+      start = mid + 1;
+    }
+    else
+    {
+      *matched = item;
+      return TRUE;
+    }
+  }
+
+  return FALSE;
 }
 
-int handle_mark(void)
+int match_isp_item(ng_isp_item_t **item, flow_info_t *flow)
 {
-  return EXIT_SUCCESS;
+  return ip_network_search(item, flow->dstip);
+}
+
+ng_isp_item_t *isp_config_at(int index)
+{
+  if (index < isp_config_index)
+  {
+    return isp_config[index];
+  }
+
+  return NULL;
+}
+
+int handle_accept(flow_info_t *flow, uint32_t mark)
+{
+  return NF_ACCEPT;
+}
+
+int handle_drop(flow_info_t *flow, uint32_t mark)
+{
+  return NF_DROP;
+}
+
+int handle_mark(flow_info_t *flow, uint32_t mark)
+{
+  flow->skb->mark = mark;
+  return NF_ACCEPT;
 }

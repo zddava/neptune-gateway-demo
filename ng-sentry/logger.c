@@ -1,3 +1,6 @@
-#include "logger.h"
+#include <linux/sysctl.h>
 
-int log_level = 0;
+#include "logger.h"
+#include "ng_types.h"
+
+int log_level = 1;

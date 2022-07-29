@@ -1,10 +1,11 @@
 obj-m += ng-sentry.o
-ng-sentry-objs := sentry.o logger.o rule.o ng_string.o ng_util.o
+ng-sentry-objs := sentry.o logger.o rule.o ng_string.o ng_util.o proc.o hook.o
 
+SDK_DIR=/opt/openwrt-sdk
 PWD=$(shell pwd)
-KERNEL_DIR="/opt/openwrt-sdk/build_dir/target-i386_pentium4_musl/linux-x86_generic/linux-5.4.188/"
-TOOLCHAIN_DIR="/opt/openwrt-sdk/staging_dir/toolchain-i386_pentium4_gcc-8.4.0_musl/bin/i486-openwrt-linux-"
-STAGING_DIR="/opt/openwrt-sdk/staging_dir/"
+KERNEL_DIR="$(SDK_DIR)/build_dir/target-i386_pentium4_musl/linux-x86_generic/linux-5.4.188/"
+TOOLCHAIN_DIR="$(SDK_DIR)/staging_dir/toolchain-i386_pentium4_gcc-8.4.0_musl/bin/i486-openwrt-linux-"
+STAGING_DIR="$(SDK_DIR)/staging_dir/"
 TARGET_CFLAGS+=-std=gnu99
 
 all:
@@ -19,3 +20,4 @@ clean:
 	rm -f *.order
 	rm -f *.symvers
 	rm -f .*.cmd
+	rm -f .*.o.d

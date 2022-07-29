@@ -8,7 +8,7 @@ char *strtok(char *str, const char *delim)
   static char *strtok_left = NULL;
   char *p_str;
   const char *p_delim;
-  boolean match_flag;
+  bool match_flag;
 
   if (str == NULL)
   {
@@ -75,7 +75,7 @@ char *fstrtok(char *str, const char *delim)
 
   char *p_str;
   const char *p_delim;
-  boolean match_flag;
+  bool match_flag;
   char *delim_point;
 
   if (str == NULL)
